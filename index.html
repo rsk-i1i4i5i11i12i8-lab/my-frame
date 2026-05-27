@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PhotoFrame">
+<title>フォトフレーム</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: #000;
+  width: 100%; height: 100%;
+  overflow: hidden;
+  font-family: 'Helvetica Neue', sans-serif;
+}
+
+/* ===== SETUP SCREEN ===== */
+#setup {
+  position: fixed; inset: 0;
+  background: #0a0a0a;
+  display: flex; align-items: center; justify-content: center;
+  padding: 2rem;
+  z-index: 100;
+}
+
+.setup-inner {
+  width: 100%; max-width: 500px;
+}
+
+.setup-title {
+  font-size: 22px;
+  font-weight: 300;
+  color: #fff;
+  letter-spacing: .1em;
+  margin-bottom: .25rem;
+}
+
+.setup-sub {
+  font-size: 13px;
+  color: #555;
+  margin-bottom: 2rem;
+  letter-spacing: .05em;
+}
+
+.setup-card {
+  background: #111;
+  border: 1px solid #1e1e1e;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.card-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+}
+
+/* Drop zone */
+.drop-zone {
+  border: 1.5px dashed #2a2a2a;
+  border-radius: 10px;
+  padding: 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+  margin-bottom: .75rem;
+}
+.drop-zone:hover, .drop-zone.drag-over {
+  border-color: #444;
+  background: #161616;
+}
+.drop-icon { font-size: 28px; margin-bottom: .5rem; }
+.drop-text { font-size: 13px; color: #555; line-height: 1.6; }
+.drop-text strong { color: #888; }
+
+#folder-input { display: none; }
+
+/* Album list */
+#album-list { margin-bottom: 1rem; }
+.album-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 10px;
+  background: #0d0d0d;
+  border-radius: 6px;
+  margin-bottom: 4px;
+  font-size: 13px;
+  color: #aaa;
+}
+.album-item span { font-size: 11px; color: #444; }
+.album-remove {
+  background: none; border: none; color: #333;
+  cursor: pointer; font-size: 16px; padding: 0 4px;
+}
+.album-remove:hover { color: #666; }
+
+/* Settings */
+.setting-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid #1a1a1a;
+  font-size: 13px; color: #aaa;
+}
+.setting-row:last-child { border: none; }
+
+.itvl-group { display: flex; gap: 5px; }
+.itvl-btn {
+  padding: 4px 10px; font-size: 11px;
+  border: 1px solid #2a2a2a; border-radius: 6px;
+  cursor: pointer; background: transparent; color: #666;
+  transition: all .15s;
+}
+.itvl-btn.active { background: #fff; color: #000; border-color: #fff; }
+
+select {
+  background: #0d0d0d; border: 1px solid #2a2a2a;
+  border-radius: 6px; padding: 4px 8px;
+  font-size: 12px; color: #aaa;
+}
+
+input[type=checkbox] { accent-color: #fff; width: auto; margin: 0; }
+
+.start-btn {
+  width: 100%; padding: 14px;
+  background: #fff; color: #000;
+  border: none; border-radius: 10px;
+  font-size: 15px; font-weight: 600;
+  cursor: pointer; transition: opacity .2s;
+  letter-spacing: .05em;
+  margin-top: .5rem;
+}
+.start-btn:hover { opacity: .85; }
+.start-btn:disabled { opacity: .3; cursor: default; }
+
+.status-empty { font-size: 13px; color: #333; text-align: center; padding: 1rem 0; }
+
+/* ===== SLIDESHOW ===== */
+#slideshow {
+  position: fixed; inset: 0;
+  background: #000;
+  display: none;
+}
+
+.slide-img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  -webkit-transition: opacity 1s ease;
+  transition: opacity 1s ease;
+}
+#slide-b { opacity: 0; }
+
+/* Clock */
+#clock {
+  position: absolute;
+  top: 20px; right: 24px;
+  font-size: 15px;
+  font-weight: 300;
+  color: rgba(255,255,255,.5);
+  letter-spacing: .08em;
+  text-shadow: 0 1px 4px rgba(0,0,0,.8);
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Album label */
+#album-label {
+  position: absolute;
+  bottom: 18px; left: 20px;
+  background: rgba(0,0,0,.45);
+  color: rgba(255,255,255,.85);
+  font-size: 12px;
+  font-weight: 300;
+  padding: 4px 10px;
+  border-radius: 4px;
+  letter-spacing: .05em;
+  pointer-events: none;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+/* Photo counter */
+#photo-counter {
+  position: absolute;
+  bottom: 18px; right: 20px;
+  font-size: 11px;
+  color: rgba(255,255,255,.3);
+  pointer-events: none;
+}
+
+/* Controls (tap to show) */
+#controls {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0;
+  transition: opacity .3s;
+  pointer-events: none;
+}
+#controls.visible {
+  opacity: 1;
+  pointer-events: all;
+}
+.ctrl-bar {
+  display: flex; gap: 12px;
+  background: rgba(0,0,0,.6);
+  padding: 10px 16px;
+  border-radius: 50px;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.ctrl-btn {
+  background: none; border: none;
+  color: rgba(255,255,255,.8);
+  font-size: 20px; cursor: pointer;
+  width: 44px; height: 44px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  transition: background .15s;
+}
+.ctrl-btn:hover { background: rgba(255,255,255,.1); }
+</style>
+</head>
+<body>
+
+<!-- SETUP -->
+<div id="setup">
+  <div class="setup-inner">
+    <div class="setup-title">PHOTO FRAME</div>
+    <div class="setup-sub">写真フォルダを追加してスライドショーを開始</div>
+
+    <div class="setup-card">
+      <div class="card-title">アルバムフォルダを追加</div>
+
+      <div class="drop-zone" id="drop-zone" onclick="document.getElementById('folder-input').click()">
+        <div class="drop-icon">📁</div>
+        <div class="drop-text">
+          <strong>タップしてフォルダを選択</strong><br>
+          またはここにドラッグ＆ドロップ<br>
+          <span style="font-size:11px;color:#333">（複数フォルダを一度に選択可）</span>
+        </div>
+      </div>
+      <input type="file" id="folder-input" webkitdirectory multiple accept="image/*" />
+
+      <div id="album-list">
+        <div class="status-empty" id="empty-msg">まだフォルダが追加されていません</div>
+      </div>
+    </div>
+
+    <div class="setup-card">
+      <div class="card-title">設定</div>
+      <div class="setting-row">
+        <span>切替間隔</span>
+        <div class="itvl-group">
+          <button class="itvl-btn" onclick="setItvl(5000)" data-v="5000">5秒</button>
+          <button class="itvl-btn active" onclick="setItvl(10000)" data-v="10000">10秒</button>
+          <button class="itvl-btn" onclick="setItvl(30000)" data-v="30000">30秒</button>
+          <button class="itvl-btn" onclick="setItvl(60000)" data-v="60000">1分</button>
+        </div>
+      </div>
+      <div class="setting-row">
+        <span>アルバム名を表示</span>
+        <input type="checkbox" id="show-name" checked />
+      </div>
+      <div class="setting-row">
+        <span>時計を表示</span>
+        <input type="checkbox" id="show-clock" checked />
+      </div>
+      <div class="setting-row">
+        <span>シャッフル</span>
+        <input type="checkbox" id="shuffle" checked />
+      </div>
+      <div class="setting-row">
+        <span>表示方法</span>
+        <select id="fit-mode">
+          <option value="cover">全画面（カバー）</option>
+          <option value="contain">黒帯あり</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="start-btn" id="start-btn" onclick="startSlideshow()" disabled>
+      ▶ スライドショーを開始
+    </button>
+  </div>
+</div>
+
+<!-- SLIDESHOW -->
+<div id="slideshow">
+  <img id="slide-a" class="slide-img" src="" alt="" />
+  <img id="slide-b" class="slide-img" src="" alt="" />
+  <div id="clock"></div>
+  <div id="album-label"></div>
+  <div id="photo-counter"></div>
+  <div id="controls">
+    <div class="ctrl-bar">
+      <button class="ctrl-btn" onclick="prevSlide()" title="前へ">◀</button>
+      <button class="ctrl-btn" id="btn-pp" onclick="togglePlay()" title="一時停止">⏸</button>
+      <button class="ctrl-btn" onclick="nextSlide()" title="次へ">▶</button>
+      <button class="ctrl-btn" onclick="doFullscreen()" title="フルスクリーン">⛶</button>
+      <button class="ctrl-btn" onclick="backToSetup()" title="設定">⚙</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== STATE =====
+let albums = []; // [{name, files:[File]}]
+let photos = []; // [{file:File, albumName:str}]
+let currentIdx = 0;
+let activeSlot = 'a';
+let ssTimer = null;
+let ctrlTimer = null;
+let intervalMs = 10000;
+let isPlaying = false;
+
+// ===== FOLDER INPUT =====
+const folderInput = document.getElementById('folder-input');
+const dropZone = document.getElementById('drop-zone');
+
+folderInput.addEventListener('change', e => {
+  handleFiles(e.target.files);
+  folderInput.value = '';
+});
+
+dropZone.addEventListener('dragover', e => {
+  e.preventDefault();
+  dropZone.classList.add('drag-over');
+});
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const items = e.dataTransfer.items;
+  if (items) {
+    const fileList = [];
+    for (const item of items) {
+      if (item.kind === 'file') {
+        const entry = item.webkitGetAsEntry();
+        if (entry && entry.isDirectory) {
+          readDir(entry, fileList, entry.name, () => handleFileArray(fileList));
+        }
+      }
+    }
+  }
+});
+
+function readDir(dirEntry, fileList, albumName, done) {
+  const reader = dirEntry.createReader();
+  reader.readEntries(entries => {
+    let pending = entries.length;
+    if (!pending) { done(); return; }
+    entries.forEach(entry => {
+      if (entry.isFile) {
+        entry.file(f => {
+          if (f.type.startsWith('image/')) {
+            f._albumName = albumName;
+            fileList.push(f);
+          }
+          if (--pending === 0) done();
+        });
+      } else {
+        if (--pending === 0) done();
+      }
+    });
+  });
+}
+
+function handleFiles(fileList) {
+  const grouped = {};
+  for (const f of fileList) {
+    if (!f.type.startsWith('image/')) continue;
+    const parts = f.webkitRelativePath.split('/');
+    const albumName = parts.length > 1 ? parts[parts.length - 2] : '未分類';
+    if (!grouped[albumName]) grouped[albumName] = [];
+    grouped[albumName].push(f);
+  }
+  for (const [name, files] of Object.entries(grouped)) {
+    addAlbum(name, files);
+  }
+}
+
+function handleFileArray(files) {
+  const grouped = {};
+  files.forEach(f => {
+    const name = f._albumName || '未分類';
+    if (!grouped[name]) grouped[name] = [];
+    grouped[name].push(f);
+  });
+  for (const [name, fs] of Object.entries(grouped)) {
+    addAlbum(name, fs);
+  }
+}
+
+function addAlbum(name, files) {
+  const existing = albums.find(a => a.name === name);
+  if (existing) {
+    existing.files.push(...files);
+  } else {
+    albums.push({ name, files });
+  }
+  renderAlbumList();
+}
+
+function removeAlbum(name) {
+  albums = albums.filter(a => a.name !== name);
+  renderAlbumList();
+}
+
+function renderAlbumList() {
+  const list = document.getElementById('album-list');
+  const emptyMsg = document.getElementById('empty-msg');
+  const startBtn = document.getElementById('start-btn');
+  if (!albums.length) {
+    list.innerHTML = '<div class="status-empty" id="empty-msg">まだフォルダが追加されていません</div>';
+    startBtn.disabled = true;
+    return;
+  }
+  list.innerHTML = albums.map(a => `
+    <div class="album-item">
+      <div>📁 ${esc(a.name)}</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span>${a.files.length}枚</span>
+        <button class="album-remove" onclick="removeAlbum('${esc(a.name)}')" title="削除">×</button>
+      </div>
+    </div>
+  `).join('');
+  startBtn.disabled = false;
+}
+
+// ===== SETTINGS =====
+function setItvl(ms) {
+  intervalMs = ms;
+  document.querySelectorAll('.itvl-btn').forEach(b =>
+    b.classList.toggle('active', parseInt(b.dataset.v) === ms)
+  );
+}
+
+// ===== SLIDESHOW =====
+function startSlideshow() {
+  photos = [];
+  for (const album of albums) {
+    for (const f of album.files) {
+      photos.push({ file: f, albumName: album.name });
+    }
+  }
+  if (!photos.length) { alert('写真が見つかりませんでした。'); return; }
+  if (document.getElementById('shuffle').checked) shuffle(photos);
+
+  const fit = document.getElementById('fit-mode').value;
+  document.getElementById('slide-a').style.objectFit = fit;
+  document.getElementById('slide-b').style.objectFit = fit;
+
+  document.getElementById('setup').style.display = 'none';
+  document.getElementById('slideshow').style.display = 'block';
+
+  activeSlot = 'a';
+  document.getElementById('slide-b').style.opacity = '0';
+  document.getElementById('slide-a').style.opacity = '1';
+
+  currentIdx = 0;
+  showSlide(0);
+  isPlaying = true;
+  updatePP();
+  startTimer();
+  startClock();
+}
+
+function showSlide(idx) {
+  const p = photos[idx]; if (!p) return;
+  const showName = document.getElementById('show-name').checked;
+  const next = activeSlot === 'a' ? 'b' : 'a';
+  const imgNext = document.getElementById('slide-' + next);
+  const imgCur = document.getElementById('slide-' + activeSlot);
+
+  const url = URL.createObjectURL(p.file);
+  imgNext.onload = () => {
+    imgNext.style.opacity = '1';
+    imgCur.style.opacity = '0';
+    URL.revokeObjectURL(imgCur.src);
+    activeSlot = next;
+  };
+  imgNext.src = url;
+
+  document.getElementById('album-label').textContent = showName ? p.albumName : '';
+  document.getElementById('album-label').style.display = showName ? 'block' : 'none';
+  document.getElementById('photo-counter').textContent = (idx + 1) + ' / ' + photos.length;
+}
+
+function nextSlide() { currentIdx = (currentIdx + 1) % photos.length; showSlide(currentIdx); }
+function prevSlide() { currentIdx = (currentIdx - 1 + photos.length) % photos.length; showSlide(currentIdx); }
+
+function startTimer() {
+  clearInterval(ssTimer);
+  ssTimer = setInterval(() => nextSlide(), intervalMs);
+}
+
+function togglePlay() {
+  isPlaying = !isPlaying;
+  updatePP();
+  if (isPlaying) startTimer(); else clearInterval(ssTimer);
+}
+
+function updatePP() {
+  document.getElementById('btn-pp').textContent = isPlaying ? '⏸' : '▶';
+}
+
+function doFullscreen() {
+  const el = document.getElementById('slideshow');
+  const req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen;
+  if (req) req.call(el);
+}
+
+function backToSetup() {
+  clearInterval(ssTimer);
+  clearInterval(clockTimer);
+  document.getElementById('slideshow').style.display = 'none';
+  document.getElementById('setup').style.display = 'flex';
+}
+
+// Controls show/hide on tap
+let ctrlVisible = false;
+document.getElementById('slideshow').addEventListener('click', e => {
+  if (e.target.closest('.ctrl-btn')) return;
+  ctrlVisible = !ctrlVisible;
+  document.getElementById('controls').classList.toggle('visible', ctrlVisible);
+  if (ctrlVisible) {
+    clearTimeout(ctrlTimer);
+    ctrlTimer = setTimeout(() => {
+      ctrlVisible = false;
+      document.getElementById('controls').classList.remove('visible');
+    }, 4000);
+  }
+});
+
+// ===== CLOCK =====
+let clockTimer = null;
+function startClock() {
+  updateClock();
+  clockTimer = setInterval(updateClock, 1000);
+}
+function updateClock() {
+  const showClock = document.getElementById('show-clock').checked;
+  const el = document.getElementById('clock');
+  el.style.display = showClock ? 'block' : 'none';
+  if (!showClock) return;
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2, '0');
+  const m = String(now.getMinutes()).padStart(2, '0');
+  el.textContent = h + ':' + m;
+}
+
+// ===== UTILS =====
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+}
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
